@@ -22,10 +22,33 @@ export const listNumbers = query({
       // Ordered by _creationTime, return most recent
       .order("desc")
       .take(args.count);
+
     const userId = await getAuthUserId(ctx);
-    const user = userId === null ? null : await ctx.db.get(userId);
+    let userEmail = null;
+
+    if (userId !== null) {
+      try {
+        // ユーザーを usersテーブルから取得
+        const user = await ctx.db
+          .query("users")
+          .filter((q) => q.eq(q.field("_id"), userId))
+          .first();
+        userEmail = user?.email ?? null;
+      } catch (error) {
+        console.error("Failed to get user with ID:", userId, error);
+        // フォールバック: 認証テーブルから直接取得を試行
+        try {
+          const user = await ctx.db.get(userId);
+          userEmail = user?.email ?? null;
+        } catch (fallbackError) {
+          console.error("Fallback failed:", fallbackError);
+          userEmail = null;
+        }
+      }
+    }
+
     return {
-      viewer: user?.email ?? null,
+      viewer: userEmail,
       numbers: numbers.reverse().map((number) => number.value),
     };
   },
